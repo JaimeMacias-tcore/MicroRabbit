@@ -3,7 +3,7 @@ using MicroRabbit.Domain.Core.Events;
 
 namespace MicroRabbit.Domain.Core.Bus
 {
-    public interface IEventHandler<in TEvent> : IEventHandler where TEvent: Event
+    public interface IEventHandler<in TEvent> : IEventHandler where TEvent : Event
     {
         Task Handle(TEvent @event);
     }
@@ -12,3 +12,4 @@ namespace MicroRabbit.Domain.Core.Bus
     {
         // Marker interface for event handlers
     }
+}
