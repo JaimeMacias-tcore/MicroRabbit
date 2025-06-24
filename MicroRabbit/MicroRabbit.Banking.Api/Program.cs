@@ -25,6 +25,7 @@ builder.Services.AddMediatR(opts =>
 });
 
 DependencyContainer.RegisterServices(builder.Services);
+DependencyContainer.RegisterBankingServices(builder.Services);
 
 builder.Services.AddControllers();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi

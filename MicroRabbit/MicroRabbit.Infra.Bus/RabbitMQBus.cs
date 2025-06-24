@@ -2,6 +2,7 @@
 using MicroRabbit.Domain.Core.Bus;
 using MicroRabbit.Domain.Core.Commands;
 using MicroRabbit.Domain.Core.Events;
+using Microsoft.Extensions.DependencyInjection;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using System.Threading.Tasks;
@@ -13,12 +14,14 @@ namespace MicroRabbit.Infra.Bus
         private readonly IMediator _mediator;
         private readonly Dictionary<string, List<Type>> _handlers;
         private readonly List<Type> _eventTypes;
+        private readonly IServiceScopeFactory _serviceScopeFactory;
 
-        public RabbitMQBus(IMediator mediator)
+        public RabbitMQBus(IMediator mediator, IServiceScopeFactory serviceScopeFactory)
         {
             _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
             _handlers = new Dictionary<string, List<Type>>();
             _eventTypes = new List<Type>();
+            _serviceScopeFactory = serviceScopeFactory;
         }
 
         public async Task Publish<T>(T @event) where T : Event
@@ -36,7 +39,7 @@ namespace MicroRabbit.Infra.Bus
 
             var eventName = @event.GetType().Name;
 
-            await channel.QueueDeclareAsync(eventName, exclusive: false);
+            await channel.QueueDeclareAsync(eventName, exclusive: false, autoDelete: false);
             string message = System.Text.Json.JsonSerializer.Serialize(@event);
 
             var body = System.Text.Encoding.UTF8.GetBytes(message);
@@ -90,7 +93,7 @@ namespace MicroRabbit.Infra.Bus
             using var connection = await factory.CreateConnectionAsync();
             using var channel = await connection.CreateChannelAsync();
 
-            await channel.QueueDeclareAsync(eventName, exclusive: false);
+            await channel.QueueDeclareAsync(eventName, exclusive: false, autoDelete: false);
             var consumer = new AsyncEventingBasicConsumer(channel);
 
             consumer.ReceivedAsync += ConsumerReceivedAsync;
@@ -118,12 +121,14 @@ namespace MicroRabbit.Infra.Bus
         {
             if(_handlers.ContainsKey(eventName))
             {
+                using var scope = _serviceScopeFactory.CreateScope();
+
                 var subscriptions = _handlers[eventName];
 
                 foreach (var subscription in subscriptions)
                 {
-                    var handler = Activator.CreateInstance(subscription);
-                    if(handler == null)
+                    var handler = scope.ServiceProvider.GetRequiredService(subscription) as IEventHandler;
+                    if (handler == null)
                     {
                         continue;
                     }
